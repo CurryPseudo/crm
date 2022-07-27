@@ -1,5 +1,5 @@
 [package]
-name = "rm_dir"
+name = "crm"
 version = "0.1.0"
 edition = "2021"
 
@@ -8,4 +8,3 @@ edition = "2021"
 [dependencies]
 clap = { version = "3.2.15", features = ["derive"] }
 indicatif = "0.16.2"
-walkdir = "2.3.2"
