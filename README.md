@@ -1,6 +1,6 @@
 # crm
 
-Just a personal tool to delete large directory on Windows.
+Just a personal tool to delete large directory on Windows, but it should work on all platform.
 
 ## Usage
 
