@@ -35,7 +35,8 @@ fn main() {
         .pb
         .finish_with_message(format!("Deleted {}", HumanBytes(context.size)));
 }
-fn remove_dir<P: AsRef<Path>>(p: P, context: &mut Context) {
+fn remove_dir<P: AsRef<Path>>(p: P, context: &mut Context) -> bool {
+    let mut all_removed = true;
     for entry in p.as_ref().read_dir().unwrap() {
         let entry = entry.unwrap();
         let path = entry.path();
@@ -43,34 +44,54 @@ fn remove_dir<P: AsRef<Path>>(p: P, context: &mut Context) {
             context.pb.println(path.display().to_string());
             let metadata = std::fs::metadata(&path).unwrap();
             let size = metadata.len();
-            std::fs::remove_file(&path).unwrap();
-            context.size += size;
-            let now = Instant::now();
-            let duration = now - context.last_time;
-            if duration.as_secs_f64() > 0.25 {
-                context.rate =
-                    ((context.size - context.last_size) as f64 / duration.as_secs_f64()) as u64;
+            match std::fs::remove_file(&path) {
+                Ok(_) => {
+                    context.size += size;
+                    let now = Instant::now();
+                    let duration = now - context.last_time;
+                    if duration.as_secs_f64() > 0.25 {
+                        context.rate = ((context.size - context.last_size) as f64
+                            / duration.as_secs_f64()) as u64;
+                    }
+                    if duration.as_secs_f64() > 2f64 {
+                        context.last_time = now;
+                        context.last_size = context.size;
+                    }
+                    context.pb.set_message(format!(
+                        "Deleted {}, rate: {}/s",
+                        HumanBytes(context.size),
+                        HumanBytes(context.rate)
+                    ));
+                }
+                Err(e) => {
+                    context.pb.println(format!("{}: {}", path.display(), e));
+                    all_removed = false;
+                }
             }
-            if duration.as_secs_f64() > 2f64 {
-                context.last_time = now;
-                context.last_size = context.size;
-            }
-            context.pb.set_message(format!(
-                "Deleted {}, rate: {}/s",
-                HumanBytes(context.size),
-                HumanBytes(context.rate)
-            ));
         } else if path.is_dir() {
-            remove_dir(path, context);
+            if !remove_dir(path, context) {
+                all_removed = false;
+            }
         } else {
             panic!("unknown path {}", path.display());
         }
     }
-    std::fs::remove_dir(p.as_ref()).unwrap();
-    context.pb.println(p.as_ref().display().to_string());
-    context.pb.set_message(format!(
-        "Deleted {}, rate: {}/s",
-        HumanBytes(context.size),
-        HumanBytes(context.rate)
-    ));
+    if all_removed {
+        match std::fs::remove_dir(p.as_ref()) {
+            Ok(_) => {
+                context.pb.println(p.as_ref().display().to_string());
+                context.pb.set_message(format!(
+                    "Deleted {}, rate: {}/s",
+                    HumanBytes(context.size),
+                    HumanBytes(context.rate)
+                ));
+            }
+            Err(e) => {
+                context
+                    .pb
+                    .println(format!("{}: {}", p.as_ref().display(), e));
+            }
+        }
+    }
+    all_removed
 }
